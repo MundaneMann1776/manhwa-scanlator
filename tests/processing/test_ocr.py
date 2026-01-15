@@ -78,8 +78,7 @@ def test_run_page_without_ocr(temp_dirs_with_image):
     assert not ocr_output.exists()
 
 
-@patch("src.processing.ocr.PaddleOCR")
-def test_run_page_with_ocr_mocked(mock_paddle, temp_dirs_with_image):
+def test_run_page_with_ocr_mocked(temp_dirs_with_image):
     """Test that OCR file is created when with_ocr=True (with mocked PaddleOCR)."""
     # Mock PaddleOCR result
     mock_ocr_instance = MagicMock()
@@ -91,7 +90,8 @@ def test_run_page_with_ocr_mocked(mock_paddle, temp_dirs_with_image):
             [[[10, 40], [90, 40], [90, 60], [10, 60]], ("테스트", 0.95)],
         ]
     ]
-    mock_paddle.return_value = mock_ocr_instance
+
+    mock_paddle_class = MagicMock(return_value=mock_ocr_instance)
 
     output_dir = (
         temp_dirs_with_image["output_dir"] / "output" / "test-source" / "test-series" / "ch001" / "pages"
@@ -112,7 +112,9 @@ def test_run_page_with_ocr_mocked(mock_paddle, temp_dirs_with_image):
         status="PENDING",
     )
 
-    result = run_page(job, with_ocr=True)
+    # Patch the PaddleOCR import inside run_ocr
+    with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_paddle_class)}):
+        result = run_page(job, with_ocr=True)
 
     # Check success
     assert result.status == "DONE"
@@ -144,13 +146,12 @@ def test_run_page_with_ocr_mocked(mock_paddle, temp_dirs_with_image):
     assert "created_at" in ocr_data
 
 
-@patch("src.processing.ocr.PaddleOCR")
-def test_run_page_with_ocr_empty_result(mock_paddle, temp_dirs_with_image):
+def test_run_page_with_ocr_empty_result(temp_dirs_with_image):
     """Test OCR with empty result (no text detected)."""
     # Mock empty OCR result
     mock_ocr_instance = MagicMock()
     mock_ocr_instance.ocr.return_value = None
-    mock_paddle.return_value = mock_ocr_instance
+    mock_paddle_class = MagicMock(return_value=mock_ocr_instance)
 
     output_dir = (
         temp_dirs_with_image["output_dir"] / "output" / "test-source" / "test-series" / "ch001" / "pages"
@@ -171,7 +172,9 @@ def test_run_page_with_ocr_empty_result(mock_paddle, temp_dirs_with_image):
         status="PENDING",
     )
 
-    result = run_page(job, with_ocr=True)
+    # Patch the PaddleOCR import inside run_ocr
+    with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_paddle_class)}):
+        result = run_page(job, with_ocr=True)
 
     # Check success
     assert result.status == "DONE"

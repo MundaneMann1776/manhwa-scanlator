@@ -5,7 +5,8 @@ import os.path as osp
 import os
 import importlib
 import subprocess
-from platform import platform
+import platform
+from platform import platform as platform_string
 
 BRANCH = 'dev'
 VERSION = '1.4.0'
@@ -25,7 +26,7 @@ PATH_ROOT=Path(__file__).parent
 PATH_FONTS=str(PATH_ROOT/'fonts')
 FONT_EXTS = {'.ttf','.otf','.ttc','.pfb'}
 
-IS_WIN7 = "Windows-7" in platform()
+IS_WIN7 = "Windows-7" in platform_string()
 
 import utils.shared as shared # Earlier import of shared to use default for config_path argument
 
@@ -354,7 +355,11 @@ def prepare_environment():
                 run_pip(f"install {req}", req)
                 req_updated = True
 
-    if is_amd_gpu():
+    # Apple Silicon: Use MPS-enabled PyTorch
+    if sys.platform == 'darwin' and platform.machine() == 'arm64':
+        print('Apple Silicon detected: Using MPS-enabled PyTorch')
+        torch_command = os.environ.get('TORCH_COMMAND', "pip install torch torchvision torchaudio --disable-pip-version-check")
+    elif is_amd_gpu():
         print('AMD GPU: Yes')
         if args.nightly:
             amd_nightly_gpu = supported_amd_nightly_gpu()
