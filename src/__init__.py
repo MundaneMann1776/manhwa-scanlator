@@ -1,0 +1,1 @@
+"""Manhwa scanlator package."""
