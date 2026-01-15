@@ -61,12 +61,17 @@ def cmd_process_page(args):
 
     # Run job
     print(f"Processing page {page_index} from {chapter_id}...")
-    result = run_page(job)
+    if args.with_ocr:
+        print("  Running OCR (Korean)...")
+    result = run_page(job, with_ocr=args.with_ocr)
 
     if result.status == "DONE":
         print(f"✓ Success")
         print(f"  Output image: {result.output_image_path}")
         print(f"  Output manifest: {result.output_manifest_path}")
+        if args.with_ocr:
+            ocr_path = output_dir / f"page_{page_index:03d}.ocr.json"
+            print(f"  OCR result: {ocr_path}")
         return 0
     else:
         print(f"✗ Failed: {result.error}")
@@ -78,4 +83,5 @@ def setup_process_commands(subparsers):
     process_page_parser = subparsers.add_parser("process-page", help="Process a single page")
     process_page_parser.add_argument("--manifest", required=True, help="Path to page manifest JSON")
     process_page_parser.add_argument("--output-dir", default="data", help="Output directory root")
+    process_page_parser.add_argument("--with-ocr", action="store_true", help="Run OCR on the page (Korean)")
     process_page_parser.set_defaults(func=cmd_process_page)
