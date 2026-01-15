@@ -8,8 +8,13 @@ from pathlib import Path
 from .job import PageJob
 
 
-def run_page(job: PageJob) -> PageJob:
-    """Execute a single page processing job."""
+def run_page(job: PageJob, with_ocr: bool = False) -> PageJob:
+    """Execute a single page processing job.
+
+    Args:
+        job: PageJob to execute
+        with_ocr: If True, run OCR on the page and write page.ocr.json
+    """
     try:
         # Validate input files exist
         if not job.input_image_path.exists():
@@ -48,6 +53,16 @@ def run_page(job: PageJob) -> PageJob:
 
         with open(job.output_manifest_path, "w") as f:
             json.dump(output_manifest, f, indent=2)
+
+        # Run OCR if requested
+        if with_ocr:
+            from .ocr import run_ocr, write_ocr_result
+
+            ocr_result = run_ocr(job)
+
+            # Write OCR result to separate file
+            ocr_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.ocr.json"
+            write_ocr_result(ocr_result, ocr_output_path)
 
         # Update job status
         job.status = "DONE"
