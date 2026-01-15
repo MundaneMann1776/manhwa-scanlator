@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .commands.acquire import setup_acquire_commands
+from .commands.process import setup_process_commands
 
 
 def main():
@@ -16,6 +17,9 @@ def main():
 
     # Setup acquisition commands
     setup_acquire_commands(subparsers)
+
+    # Setup processing commands
+    setup_process_commands(subparsers)
 
     args = parser.parse_args()
 
