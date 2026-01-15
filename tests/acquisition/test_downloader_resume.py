@@ -129,7 +129,7 @@ def test_download_chapter_no_resume(test_chapter_source, output_dir):
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     img = Image.new("RGB", (100, 200), color=(0, 255, 0))
-    (pages_dir / "000.png").save(img)
+    img.save(pages_dir / "000.png")
 
     # Download with resume disabled
     result = download_chapter(adapter, chapters[0], output_dir, db, max_workers=2, resume=False)
