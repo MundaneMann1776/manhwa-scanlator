@@ -8,7 +8,7 @@ from pathlib import Path
 from .job import PageJob
 
 
-def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False, with_grouping: bool = False) -> PageJob:
+def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False, with_grouping: bool = False, with_inpaint: bool = False) -> PageJob:
     """Execute a single page processing job.
 
     Args:
@@ -18,6 +18,8 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
                         Requires OCR file to exist (either from with_ocr or previous run)
         with_grouping: If True, group OCR lines into regions and write page.groups.json
                        Requires OCR file to exist (either from with_ocr or previous run)
+        with_inpaint: If True, inpaint text regions and write page.cleaned.png
+                      Requires grouping file to exist (either from with_grouping or previous run)
     """
     try:
         # Validate input files exist
@@ -90,6 +92,7 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
             write_translation_result(translation_result, translation_output_path)
 
         # Run grouping if requested
+        grouping_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.groups.json"
         if with_grouping:
             from .group import group_lines, write_grouping_result
 
@@ -107,8 +110,24 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
             grouping_result = group_lines(ocr_result)
 
             # Write grouping result
-            grouping_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.groups.json"
             write_grouping_result(grouping_result, grouping_output_path)
+
+        # Run inpainting if requested
+        if with_inpaint:
+            from .inpaint import run_inpaint
+
+            # Check if grouping file exists
+            if not grouping_output_path.exists():
+                job.status = "FAILED"
+                job.error = f"Grouping file not found for inpainting: {grouping_output_path}"
+                return job
+
+            # Read grouping result
+            with open(grouping_output_path, "r", encoding="utf-8") as f:
+                grouping_result = json.load(f)
+
+            # Run inpainting on the output image (which is a copy of input)
+            cleaned_image_path = run_inpaint(job.output_image_path, grouping_result)
 
         # Update job status
         job.status = "DONE"
