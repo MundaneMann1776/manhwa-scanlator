@@ -8,31 +8,47 @@ from src.acquisition.db import AcquisitionDB
 from src.acquisition.downloader import download_chapter
 from src.acquisition.filesystem_adapter import FilesystemAdapter
 from src.acquisition.adapters.manhwaraw import ManhwaRawAdapter
-
-
-# Global registry of adapters
-_ADAPTERS = {}
-
-
-def register_adapter(source_id: str, adapter):
-    """Register a source adapter."""
-    _ADAPTERS[source_id] = adapter
+from src.acquisition import registry
 
 
 def get_adapter(source_id: str):
-    """Get registered adapter by source ID."""
-    return _ADAPTERS.get(source_id)
+    """Get adapter instance for a registered source.
+
+    Args:
+        source_id: Source identifier
+
+    Returns:
+        Instantiated adapter or None if source not found
+    """
+    source_config = registry.get_source(source_id)
+    if not source_config:
+        return None
+
+    source_type = source_config.get("type")
+
+    if source_type == "filesystem":
+        path = source_config.get("path")
+        if not path:
+            print(f"Error: Filesystem source {source_id} missing path")
+            return None
+        return FilesystemAdapter(source_id, Path(path))
+    elif source_type == "manhwaraw":
+        return ManhwaRawAdapter()
+    else:
+        print(f"Error: Unknown source type: {source_type}")
+        return None
 
 
 def cmd_add_source(args):
     """Add a new source adapter."""
     if args.type == "filesystem":
-        adapter = FilesystemAdapter(args.source_id, Path(args.path))
-        register_adapter(args.source_id, adapter)
+        if not args.path:
+            print("Error: --path is required for filesystem sources")
+            return 1
+        registry.add_source(args.source_id, args.type, path=args.path)
         print(f"Added filesystem source: {args.source_id} at {args.path}")
     elif args.type == "manhwaraw":
-        adapter = ManhwaRawAdapter()
-        register_adapter(args.source_id, adapter)
+        registry.add_source(args.source_id, args.type)
         print(f"Added manhwaraw source: {args.source_id}")
     else:
         print(f"Unknown source type: {args.type}")
@@ -43,13 +59,20 @@ def cmd_add_source(args):
 
 def cmd_list_sources(args):
     """List all registered sources."""
-    if not _ADAPTERS:
+    sources = registry.list_sources()
+
+    if not sources:
         print("No sources registered")
         return 0
 
     print("Registered sources:")
-    for source_id in _ADAPTERS:
-        print(f"  - {source_id}")
+    for source_id, config in sources.items():
+        source_type = config.get("type", "unknown")
+        if source_type == "filesystem":
+            path = config.get("path", "?")
+            print(f"  - {source_id} ({source_type}: {path})")
+        else:
+            print(f"  - {source_id} ({source_type})")
 
     return 0
 

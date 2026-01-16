@@ -8,6 +8,8 @@ data/testpacks/eng_dontupload
 data/testpacks/testpacks
 data/*.png
 data/testpacks
+data/sources.json
+data/acquisition.db
 config/textstyles
 release
 libs
