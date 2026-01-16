@@ -8,12 +8,16 @@ from pathlib import Path
 from .job import PageJob
 
 
-def run_page(job: PageJob, with_ocr: bool = False) -> PageJob:
+def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False, with_grouping: bool = False) -> PageJob:
     """Execute a single page processing job.
 
     Args:
         job: PageJob to execute
         with_ocr: If True, run OCR on the page and write page.ocr.json
+        with_translate: If True, translate OCR text and write page.translated.json
+                        Requires OCR file to exist (either from with_ocr or previous run)
+        with_grouping: If True, group OCR lines into regions and write page.groups.json
+                       Requires OCR file to exist (either from with_ocr or previous run)
     """
     try:
         # Validate input files exist
@@ -55,14 +59,56 @@ def run_page(job: PageJob, with_ocr: bool = False) -> PageJob:
             json.dump(output_manifest, f, indent=2)
 
         # Run OCR if requested
+        ocr_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.ocr.json"
         if with_ocr:
             from .ocr import run_ocr, write_ocr_result
 
             ocr_result = run_ocr(job)
 
             # Write OCR result to separate file
-            ocr_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.ocr.json"
             write_ocr_result(ocr_result, ocr_output_path)
+
+        # Run translation if requested
+        if with_translate:
+            from .translate import run_translation, write_translation_result
+
+            # Check if OCR file exists
+            if not ocr_output_path.exists():
+                job.status = "FAILED"
+                job.error = f"OCR file not found for translation: {ocr_output_path}"
+                return job
+
+            # Read OCR result
+            with open(ocr_output_path, "r", encoding="utf-8") as f:
+                ocr_result = json.load(f)
+
+            # Run translation
+            translation_result = run_translation(ocr_result, str(ocr_output_path))
+
+            # Write translation result
+            translation_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.translated.json"
+            write_translation_result(translation_result, translation_output_path)
+
+        # Run grouping if requested
+        if with_grouping:
+            from .group import group_lines, write_grouping_result
+
+            # Check if OCR file exists
+            if not ocr_output_path.exists():
+                job.status = "FAILED"
+                job.error = f"OCR file not found for grouping: {ocr_output_path}"
+                return job
+
+            # Read OCR result
+            with open(ocr_output_path, "r", encoding="utf-8") as f:
+                ocr_result = json.load(f)
+
+            # Run grouping
+            grouping_result = group_lines(ocr_result)
+
+            # Write grouping result
+            grouping_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.groups.json"
+            write_grouping_result(grouping_result, grouping_output_path)
 
         # Update job status
         job.status = "DONE"

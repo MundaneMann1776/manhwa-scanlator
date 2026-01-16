@@ -63,7 +63,11 @@ def cmd_process_page(args):
     print(f"Processing page {page_index} from {chapter_id}...")
     if args.with_ocr:
         print("  Running OCR (Korean)...")
-    result = run_page(job, with_ocr=args.with_ocr)
+    if args.with_translate:
+        print("  Running translation (Korean → English via Papago)...")
+    if args.with_grouping:
+        print("  Grouping OCR lines into regions...")
+    result = run_page(job, with_ocr=args.with_ocr, with_translate=args.with_translate, with_grouping=args.with_grouping)
 
     if result.status == "DONE":
         print(f"✓ Success")
@@ -72,6 +76,12 @@ def cmd_process_page(args):
         if args.with_ocr:
             ocr_path = output_dir / f"page_{page_index:03d}.ocr.json"
             print(f"  OCR result: {ocr_path}")
+        if args.with_translate:
+            translate_path = output_dir / f"page_{page_index:03d}.translated.json"
+            print(f"  Translation result: {translate_path}")
+        if args.with_grouping:
+            grouping_path = output_dir / f"page_{page_index:03d}.groups.json"
+            print(f"  Grouping result: {grouping_path}")
         return 0
     else:
         print(f"✗ Failed: {result.error}")
@@ -84,4 +94,6 @@ def setup_process_commands(subparsers):
     process_page_parser.add_argument("--manifest", required=True, help="Path to page manifest JSON")
     process_page_parser.add_argument("--output-dir", default="data", help="Output directory root")
     process_page_parser.add_argument("--with-ocr", action="store_true", help="Run OCR on the page (Korean)")
+    process_page_parser.add_argument("--with-translate", action="store_true", help="Translate OCR text (Korean → English via Papago)")
+    process_page_parser.add_argument("--with-grouping", action="store_true", help="Group OCR lines into regions (requires OCR)")
     process_page_parser.set_defaults(func=cmd_process_page)
