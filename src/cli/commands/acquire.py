@@ -7,6 +7,7 @@ from pathlib import Path
 from src.acquisition.db import AcquisitionDB
 from src.acquisition.downloader import download_chapter
 from src.acquisition.filesystem_adapter import FilesystemAdapter
+from src.acquisition.adapters.manhwaraw import ManhwaRawAdapter
 
 
 # Global registry of adapters
@@ -29,6 +30,10 @@ def cmd_add_source(args):
         adapter = FilesystemAdapter(args.source_id, Path(args.path))
         register_adapter(args.source_id, adapter)
         print(f"Added filesystem source: {args.source_id} at {args.path}")
+    elif args.type == "manhwaraw":
+        adapter = ManhwaRawAdapter()
+        register_adapter(args.source_id, adapter)
+        print(f"Added manhwaraw source: {args.source_id}")
     else:
         print(f"Unknown source type: {args.type}")
         return 1
@@ -47,6 +52,37 @@ def cmd_list_sources(args):
         print(f"  - {source_id}")
 
     return 0
+
+
+def cmd_search(args):
+    """Search for series in a source."""
+    adapter = get_adapter(args.source_id)
+    if not adapter:
+        print(f"Source not found: {args.source_id}")
+        return 1
+
+    try:
+        results = adapter.discover_series(args.query)
+
+        if not results:
+            print(f"No results found for: {args.query}")
+            return 0
+
+        print(f"Found {len(results)} results for '{args.query}':\n")
+
+        for idx, series in enumerate(results, 1):
+            print(f"{idx}. {series.title}")
+            print(f"   ID: {series.series_id}")
+            print(f"   URL: {series.url}")
+            if series.thumbnail_url:
+                print(f"   Thumbnail: {series.thumbnail_url}")
+            print()
+
+        return 0
+
+    except Exception as e:
+        print(f"Search failed: {e}")
+        return 1
 
 
 def cmd_sync(args):
@@ -93,13 +129,19 @@ def setup_acquire_commands(subparsers):
     # add-source command
     add_source_parser = subparsers.add_parser("add-source", help="Add a new source adapter")
     add_source_parser.add_argument("source_id", help="Unique identifier for the source")
-    add_source_parser.add_argument("--type", required=True, choices=["filesystem"], help="Source adapter type")
-    add_source_parser.add_argument("--path", required=True, help="Path for filesystem source")
+    add_source_parser.add_argument("--type", required=True, choices=["filesystem", "manhwaraw"], help="Source adapter type")
+    add_source_parser.add_argument("--path", help="Path for filesystem source (required if type=filesystem)")
     add_source_parser.set_defaults(func=cmd_add_source)
 
     # list-sources command
     list_sources_parser = subparsers.add_parser("list-sources", help="List registered sources")
     list_sources_parser.set_defaults(func=cmd_list_sources)
+
+    # search command
+    search_parser = subparsers.add_parser("search", help="Search for series in a source")
+    search_parser.add_argument("source_id", help="Source identifier")
+    search_parser.add_argument("query", help="Search query (series title)")
+    search_parser.set_defaults(func=cmd_search)
 
     # sync command
     sync_parser = subparsers.add_parser("sync", help="Sync a series from a source")
