@@ -54,18 +54,19 @@ class ManhwaRawAdapter(SourceAdapter):
 
         series_list = []
 
-        # Try multiple selectors (Madara themes vary slightly)
-        # Option 1: .c-tabs-item__content (common Madara)
-        for item in soup.select(".c-tabs-item__content"):
-            title_elem = item.select_one(".post-title h3 a, .post-title a, h3 a")
+        # Try multiple selectors (site structure varies)
+        # Option 1: .block-wrapper (current site structure as of Jan 2026)
+        for link_elem in soup.select("a.block-wrapper"):
+            url = link_elem.get("href", "")
+            if not url or "/manhwa-raw/" not in url:
+                continue
+
+            # Get title from .movie-title-1 span
+            title_elem = link_elem.select_one(".movie-title-1")
             if not title_elem:
                 continue
 
             title = title_elem.get_text(strip=True)
-            url = title_elem.get("href", "")
-
-            if not url:
-                continue
 
             # Extract series ID from URL
             # Expected: https://manhwaraw.com/manhwa-raw/series-name/
@@ -76,18 +77,51 @@ class ManhwaRawAdapter(SourceAdapter):
                 # Fallback: use last path segment
                 series_id = url.rstrip("/").split("/")[-1]
 
-            # Get thumbnail if available
-            img_elem = item.select_one("img")
-            thumbnail_url = img_elem.get("data-src") or img_elem.get("src") if img_elem else None
+            # Get thumbnail/cover image if available
+            img_elem = link_elem.select_one("img")
+            cover_url = img_elem.get("data-src") or img_elem.get("src") if img_elem else None
 
             series_list.append(SeriesInfo(
+                source_id="manhwaraw",  # Fixed source identifier
                 series_id=series_id,
                 title=title,
-                url=url,
-                thumbnail_url=thumbnail_url
+                description=None,  # Not available in search results
+                author=None,  # Not available in search results
+                cover_url=cover_url
             ))
 
-        # Option 2: .post-title (alternative structure)
+        # Option 2: .c-tabs-item__content (older Madara structure)
+        if not series_list:
+            for item in soup.select(".c-tabs-item__content"):
+                title_elem = item.select_one(".post-title h3 a, .post-title a, h3 a")
+                if not title_elem:
+                    continue
+
+                title = title_elem.get_text(strip=True)
+                url = title_elem.get("href", "")
+
+                if not url:
+                    continue
+
+                match = re.search(r"/manhwa-raw/([^/]+)/?$", url)
+                if match:
+                    series_id = match.group(1)
+                else:
+                    series_id = url.rstrip("/").split("/")[-1]
+
+                img_elem = item.select_one("img")
+                cover_url = img_elem.get("data-src") or img_elem.get("src") if img_elem else None
+
+                series_list.append(SeriesInfo(
+                    source_id="manhwaraw",
+                    series_id=series_id,
+                    title=title,
+                    description=None,
+                    author=None,
+                    cover_url=cover_url
+                ))
+
+        # Option 3: .post-title (fallback structure)
         if not series_list:
             for item in soup.select(".post-title"):
                 link_elem = item.select_one("a")
@@ -107,10 +141,12 @@ class ManhwaRawAdapter(SourceAdapter):
                     series_id = url.rstrip("/").split("/")[-1]
 
                 series_list.append(SeriesInfo(
+                    source_id="manhwaraw",
                     series_id=series_id,
                     title=title,
-                    url=url,
-                    thumbnail_url=None
+                    description=None,
+                    author=None,
+                    cover_url=None
                 ))
 
         return series_list

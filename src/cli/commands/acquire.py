@@ -96,9 +96,11 @@ def cmd_search(args):
         for idx, series in enumerate(results, 1):
             print(f"{idx}. {series.title}")
             print(f"   ID: {series.series_id}")
-            print(f"   URL: {series.url}")
-            if series.thumbnail_url:
-                print(f"   Thumbnail: {series.thumbnail_url}")
+            print(f"   Source: {series.source_id}")
+            if series.author:
+                print(f"   Author: {series.author}")
+            if series.cover_url:
+                print(f"   Cover: {series.cover_url}")
             print()
 
         return 0
