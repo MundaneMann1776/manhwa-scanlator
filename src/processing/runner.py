@@ -8,7 +8,7 @@ from pathlib import Path
 from .job import PageJob
 
 
-def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False, with_grouping: bool = False, with_inpaint: bool = False) -> PageJob:
+def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False, with_grouping: bool = False, with_inpaint: bool = False, with_render: bool = False) -> PageJob:
     """Execute a single page processing job.
 
     Args:
@@ -20,6 +20,8 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
                        Requires OCR file to exist (either from with_ocr or previous run)
         with_inpaint: If True, inpaint text regions and write page.cleaned.png
                       Requires grouping file to exist (either from with_grouping or previous run)
+        with_render: If True, render translated text onto cleaned image and write page.rendered.png
+                     Requires grouping, translation, and cleaned image to exist
     """
     try:
         # Validate input files exist
@@ -113,6 +115,7 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
             write_grouping_result(grouping_result, grouping_output_path)
 
         # Run inpainting if requested
+        cleaned_image_path = None
         if with_inpaint:
             from .inpaint import run_inpaint
 
@@ -128,6 +131,42 @@ def run_page(job: PageJob, with_ocr: bool = False, with_translate: bool = False,
 
             # Run inpainting on the output image (which is a copy of input)
             cleaned_image_path = run_inpaint(job.output_image_path, grouping_result)
+
+        # Run rendering if requested
+        if with_render:
+            from .render import render_page
+
+            # Determine cleaned image path
+            if cleaned_image_path is None:
+                # Check if cleaned image exists from previous run
+                cleaned_image_path = job.output_image_path.parent / f"{job.output_image_path.stem}.cleaned.png"
+                if not cleaned_image_path.exists():
+                    job.status = "FAILED"
+                    job.error = f"Cleaned image not found for rendering: {cleaned_image_path}"
+                    return job
+
+            # Check if grouping file exists
+            if not grouping_output_path.exists():
+                job.status = "FAILED"
+                job.error = f"Grouping file not found for rendering: {grouping_output_path}"
+                return job
+
+            # Check if translation file exists
+            translation_output_path = job.output_manifest_path.parent / f"page_{job.page_index:03d}.translated.json"
+            if not translation_output_path.exists():
+                job.status = "FAILED"
+                job.error = f"Translation file not found for rendering: {translation_output_path}"
+                return job
+
+            # Read grouping and translation results
+            with open(grouping_output_path, "r", encoding="utf-8") as f:
+                grouping_result = json.load(f)
+
+            with open(translation_output_path, "r", encoding="utf-8") as f:
+                translation_result = json.load(f)
+
+            # Run rendering
+            rendered_image_path = render_page(cleaned_image_path, grouping_result, translation_result)
 
         # Update job status
         job.status = "DONE"

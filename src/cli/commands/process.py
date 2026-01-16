@@ -69,7 +69,9 @@ def cmd_process_page(args):
         print("  Grouping OCR lines into regions...")
     if args.with_inpaint:
         print("  Inpainting text regions...")
-    result = run_page(job, with_ocr=args.with_ocr, with_translate=args.with_translate, with_grouping=args.with_grouping, with_inpaint=args.with_inpaint)
+    if args.with_render:
+        print("  Rendering translated text...")
+    result = run_page(job, with_ocr=args.with_ocr, with_translate=args.with_translate, with_grouping=args.with_grouping, with_inpaint=args.with_inpaint, with_render=args.with_render)
 
     if result.status == "DONE":
         print(f"✓ Success")
@@ -87,6 +89,9 @@ def cmd_process_page(args):
         if args.with_inpaint:
             cleaned_path = output_dir / f"{page_index:03d}_processed.cleaned.png"
             print(f"  Cleaned image: {cleaned_path}")
+        if args.with_render:
+            rendered_path = output_dir / f"{page_index:03d}_processed.rendered.png"
+            print(f"  Rendered image: {rendered_path}")
         return 0
     else:
         print(f"✗ Failed: {result.error}")
@@ -102,4 +107,5 @@ def setup_process_commands(subparsers):
     process_page_parser.add_argument("--with-translate", action="store_true", help="Translate OCR text (Korean → English via Papago)")
     process_page_parser.add_argument("--with-grouping", action="store_true", help="Group OCR lines into regions (requires OCR)")
     process_page_parser.add_argument("--with-inpaint", action="store_true", help="Inpaint text regions (requires grouping)")
+    process_page_parser.add_argument("--with-render", action="store_true", help="Render translated text (requires translation, grouping, and inpainting)")
     process_page_parser.set_defaults(func=cmd_process_page)
